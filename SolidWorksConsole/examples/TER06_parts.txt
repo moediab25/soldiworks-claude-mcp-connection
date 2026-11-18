@@ -1,0 +1,24 @@
+# Parts to draw (one SolidWorks part file name per line, without or with .SLDPRT).
+# Put a copy named parts.txt in the project folder. Without it, every .SLDPRT in the folder is drawn.
+# Bought parts are left out (NEMA 17, SG90, Pi 4, LCD, bearing, hinge, AT5 belt, 22 mm LED buttons),
+# and so are the LED strip, both AT5 pulleys and the idler shaft.
+cleat
+TER06_Acrylic_Face
+TER06_Back_Panel
+TER06_Collector_Chute2
+TER06_Control_Cleat
+TER06_Control_Panel
+TER06_Diverter_Flap
+TER06_Divider_Panel
+TER06_Lift_Guide
+TER06_Lift_Plate
+TER06_Lift_Sump
+TER06_Maze_Plate
+TER06_Motor_Bracket
+TER06_Pi_Mount
+TER06_Port_Feeder
+TER06_Return_Rail
+TER06_Return_Tubes
+TER06_Side_Panel
+TER06_Top_Bottom_Panel
+TER06_Wall_Bracket

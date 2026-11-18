@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+*.user
+# SolidWorks files never belong here (code only)
+*.SLDPRT
+*.SLDASM
+*.SLDDRW
+*.pdf
+~$*
