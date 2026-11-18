@@ -17,6 +17,7 @@ internal static class Program
     // Set in Main: project folder (--dir, default = current folder) and SolidWorks template paths
     // (newest installed SolidWorks version is detected, so this runs on any PC with SolidWorks).
     static string Dir = "", Template = "", SheetFormat = "", SheetFormatPortrait = "";
+    static readonly HashSet<string> Created = new(); // titles of drawings this run made (for cleanup after a failure)
     const double SheetW = 0.297, SheetH = 0.210;
 
     // Parts to draw: names on the command line, else parts.txt in the project folder
@@ -77,11 +78,19 @@ internal static class Program
                 // Each part opens itself + one drawing; close both afterwards so SolidWorks never
                 // holds more than those 2 (plus whatever the user already had open).
                 var before = OpenDocs(swApp).Select(d => d.GetTitle()).ToHashSet();
+                string partPath = Path.Combine(Dir, p + ".SLDPRT");
+                Created.Clear();
                 try { MakeDrawing(swApp, p, outDir); ok++; }
                 catch (Exception ex) { Console.WriteLine($"FAIL\t{p}\t{ex.Message}"); }
                 finally
                 {
-                    try { foreach (var d in OpenDocs(swApp).Where(d => !before.Contains(d.GetTitle()))) swApp.CloseDoc(d.GetTitle()); }
+                    // only what this run opened: the part itself and drawings it created (never a file the user opened meanwhile)
+                    try
+                    {
+                        foreach (var d in OpenDocs(swApp).Where(d => !before.Contains(d.GetTitle())
+                                     && (Created.Contains(d.GetTitle()) || string.Equals(d.GetPathName(), partPath, StringComparison.OrdinalIgnoreCase))))
+                            swApp.CloseDoc(d.GetTitle());
+                    }
                     catch (COMException) { } // SolidWorks went away; next part reconnects
                 }
             }
@@ -121,6 +130,7 @@ internal static class Program
         DimCounts Probe(double ps)
         {
             var probe = (ModelDoc2)swApp.NewDocument(Template, (int)swDwgPaperSizes_e.swDwgPaperA4size, SheetW, SheetH);
+            Created.Add(probe.GetTitle());
             var pv = new[]
             {
                 Place((DrawingDoc)probe, partPath, "*Front", ps, 0.07, 0.10),
@@ -181,6 +191,7 @@ internal static class Program
         double sw = L.portrait ? SheetH : SheetW, sh = L.portrait ? SheetW : SheetH;
         int paper = (int)(L.portrait ? swDwgPaperSizes_e.swDwgPaperA4sizeVertical : swDwgPaperSizes_e.swDwgPaperA4size);
         var drw = (ModelDoc2)swApp.NewDocument(Template, paper, sw, sh);
+        Created.Add(drw.GetTitle());
         var dd = (DrawingDoc)drw;
         string sheetName = ((Sheet)dd.GetCurrentSheet()).GetName();
         dd.SetupSheet5(sheetName, paper, (int)swDwgTemplates_e.swDwgTemplateCustom,
@@ -416,10 +427,10 @@ internal static class Program
                                  .Where(f => Mm(f) >= 0.5).GroupBy(Mm).Select(g => g.OrderByDescending(f => f.Line).First())
                                  .OrderBy(Mm).ToList();
                 // Lines closer than MinGap on paper can't be told apart (sheet-thickness offsets, bend lines):
-                // keep the overall size and drop anything crowding a kept line or the base edge.
+                // keep the overall size and drop lines crowding a kept line or the base edge. Holes are always kept.
                 var kept = new List<Feat>();
                 for (int k = feats.Count - 1; k >= 0; k--)
-                    if (kept.Count == 0 || (kept[^1].Pos - feats[k].Pos >= MinGap && feats[k].Pos - baseF.Pos >= MinGap))
+                    if (kept.Count == 0 || !feats[k].Line || (kept[^1].Pos - feats[k].Pos >= MinGap && feats[k].Pos - baseF.Pos >= MinGap))
                         kept.Add(feats[k]);
                 kept.Reverse(); feats = kept;
                 // a size already shown on this model axis in another view is not repeated
@@ -608,7 +619,7 @@ internal static class Program
             bool mine = path.StartsWith(Dir, StringComparison.OrdinalIgnoreCase)
                         && (path.EndsWith(".SLDPRT", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".SLDDRW", StringComparison.OrdinalIgnoreCase));
             bool emptyDrawing = path == "" && d.GetType() == (int)swDocumentTypes_e.swDocDRAWING;
-            if ((mine && !d.GetSaveFlag()) || emptyDrawing) { swApp.CloseDoc(d.GetTitle()); closed++; }
+            if ((mine || emptyDrawing) && !d.GetSaveFlag()) { swApp.CloseDoc(d.GetTitle()); closed++; } // CloseDoc discards changes
         }
         Console.WriteLine($"Closed {closed} leftover document(s); {OpenDocs(swApp).Count} still open.");
     }
